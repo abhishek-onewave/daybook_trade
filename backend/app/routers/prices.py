@@ -202,7 +202,7 @@ async def get_prices(
     cached = load_quote_cache(session)
     refresh_error: str | None = None
 
-    if settings.alpaca_configured and _needs_refresh(
+    if settings.alpaca_enabled and _needs_refresh(
         cached,
         now=now,
         market_open=market_open,
@@ -220,9 +220,13 @@ async def get_prices(
 
     if not cached:
         message = (
-            "Alpaca market data is temporarily unavailable."
-            if settings.alpaca_configured
-            else "Alpaca credentials are not configured."
+            "Alpaca is configured but disabled while preview mode is active."
+            if settings.alpaca_configured and settings.daybook_demo_mode
+            else (
+                "Alpaca market data is temporarily unavailable."
+                if settings.alpaca_configured
+                else "Alpaca credentials are not configured."
+            )
         )
         return _unavailable_response(
             code="MARKET_DATA_UNAVAILABLE",

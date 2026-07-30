@@ -6,11 +6,18 @@
 the application before credentials are configured. The private API service
 migrates a throwaway SQLite database at `/tmp/daybook-demo.db`, disables the
 internal API token requirement, does not start provider pollers, and refuses
-any Postgres `DATABASE_URL`. The Web service skips Basic authentication only
-in this mode and displays a persistent preview banner.
+to use any configured Postgres URL or provider credential. The Web service
+skips Basic authentication only in this mode and displays a persistent preview
+banner. This lets variables be added incrementally without breaking the
+preview or exposing paid integrations publicly.
 
 Remove the variable before connecting Supabase or any real provider. Demo mode
 is intentionally public and ephemeral.
+
+Provider readiness is capability-based in live mode. Missing credentials do
+not block unrelated services. The health contract and Settings page distinguish
+`ready`, `not_configured`, `disabled_in_demo`, and `pending_phase` so configured
+but unfinished integrations are never presented as operational.
 
 ## Phase 0
 

@@ -237,6 +237,114 @@ h2 {
   margin: 0;
 }
 
+.integration-panel {
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
+  padding: 36px;
+}
+
+.integration-intro {
+  color: var(--color-ink-mute);
+  margin-bottom: 0;
+}
+
+.mode-badge,
+.connection-state {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 5px 9px;
+  text-transform: uppercase;
+}
+
+.mode-badge {
+  background: var(--color-violet);
+  color: var(--color-indigo-deep);
+}
+
+.integration-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 28px;
+}
+
+.integration-card {
+  border: 1px solid var(--color-hairline);
+  border-radius: 10px;
+  padding: 20px;
+}
+
+.integration-card-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.integration-card h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.integration-card p {
+  color: var(--color-ink-mute);
+  margin: 10px 0 16px;
+}
+
+.integration-card small {
+  color: var(--color-ink-mute);
+}
+
+.connection-ready {
+  background: #dff4ec;
+  color: var(--color-market-up);
+}
+
+.connection-not_configured {
+  background: var(--color-soft);
+  color: var(--color-ink-mute);
+}
+
+.connection-disabled_in_demo {
+  background: #fff3ca;
+  color: #493a0b;
+}
+
+.connection-pending_phase {
+  background: #eee8fb;
+  color: var(--color-indigo);
+}
+
+.database-status,
+.integration-loading,
+.integration-error {
+  border-top: 1px solid var(--color-hairline);
+  color: var(--color-ink-mute);
+  margin: 28px 0 0;
+  padding-top: 20px;
+}
+
+.integration-error {
+  border-left: 3px solid var(--color-market-down);
+  padding-left: 14px;
+}
+
+@media (max-width: 700px) {
+  .integration-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .integration-panel {
+    padding: 24px;
+  }
+}
+
 .market-workspace {
   margin-top: -96px;
   position: relative;

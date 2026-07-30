@@ -2,9 +2,11 @@ import { timingSafeEqual } from "node:crypto";
 
 import { type NextRequest, NextResponse } from "next/server";
 
+import { environmentFlag } from "@/lib/environment";
+
 const USERNAME = "daybook";
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
-const DEMO_MODE = process.env.DAYBOOK_DEMO_MODE === "true";
+const DEMO_MODE = environmentFlag(process.env.DAYBOOK_DEMO_MODE);
 
 function matches(expected: string, actual: string) {
   const expectedBytes = Buffer.from(expected);

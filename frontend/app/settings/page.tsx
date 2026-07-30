@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { IntegrationStatus } from "@/components/integration-status";
 import { PageScaffold } from "@/components/page-scaffold";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -11,7 +12,8 @@ export default function SettingsPage() {
       title="Make Daybook yours."
       description="Answer depth, refresh cadence, connection status, and usage controls."
       showClosingBand={false}
-    />
+    >
+      <IntegrationStatus />
+    </PageScaffold>
   );
 }
-

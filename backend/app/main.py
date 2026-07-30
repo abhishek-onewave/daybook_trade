@@ -24,9 +24,8 @@ async def lifespan(app: FastAPI):
     app.state.quote_poller_task = None
 
     if (
-        settings.alpaca_configured
+        settings.alpaca_enabled
         and not settings.is_deployed
-        and not settings.daybook_demo_mode
     ):
         client = AlpacaClient(settings)
         app.state.alpaca_client = client

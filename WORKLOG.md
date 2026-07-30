@@ -1012,3 +1012,78 @@ daybook-trade-web  https://daybook-trade-web.vercel.app
 The removed Vercel project and its historical deployments are not recoverable
 through this workspace. The Git repository and retained
 `daybook-trade-web` deployment contain the complete application source.
+
+## Cross-cutting checkpoint — independent provider configuration (2026-07-29)
+
+Goal: keep the application available when any provider credentials are absent,
+detect newly configured credentials independently, and never claim an
+unimplemented integration is ready.
+
+Implementation:
+
+- Demo/preview mode now ignores configured Supabase and provider credentials,
+  uses temporary SQLite on Vercel, and never starts the Alpaca poller.
+- Live mode evaluates Alpaca, Anthropic, Finnhub, and Tastytrade independently.
+  A missing provider only disables that provider.
+- `/api/health` reports configuration, enablement, implementation, and state for
+  each provider. The Settings page renders the same capability states.
+- Alpaca refresh returns a provider-specific unavailable response when its
+  credentials are missing or preview mode disables it.
+- Anthropic, Finnhub, and Tastytrade are reported as pending rather than ready
+  because their gated implementation phases have not started.
+
+Real local verification:
+
+```text
+$ make test
+27 passed, 1 warning
+
+$ make guard
+1 passed
+All checks passed!
+
+$ cd frontend && npm run lint
+eslint .
+
+$ cd frontend && npm run build
+✓ Compiled successfully
+✓ Finished TypeScript
+✓ Generating static pages (10/10)
+```
+
+With `DAYBOOK_DEMO_MODE=false` but the required application access credentials
+absent, the first production deployment correctly failed closed:
+
+```text
+$ curl https://daybook-trade-web.vercel.app/api/health
+Service unavailable.
+HTTP 503
+
+$ curl https://daybook-trade-web.vercel.app/settings
+HTTP 503
+```
+
+No provider or application secret value was printed. Production preview mode
+was restored with `DAYBOOK_DEMO_MODE=true`, and the unified project was
+redeployed successfully:
+
+```text
+Deployment https://daybook-trade-fixe6pkv7-one-wave.vercel.app
+Aliased https://daybook-trade-web.vercel.app
+Ready in 34s
+
+$ curl https://daybook-trade-web.vercel.app/api/health
+{"status":"ok","mode":"demo","as_of":"2026-07-30T05:23:13.386926Z","database":{"configured":true,"connected":true,"persistent":false},"integrations":{"anthropic_configured":true,"alpaca_configured":false,"tastytrade_configured":false,"finnhub_configured":true},"capabilities":{"anthropic":{"configured":true,"enabled":false,"implemented":false,"state":"disabled_in_demo"},"alpaca":{"configured":false,"enabled":false,"implemented":true,"state":"not_configured"},"tastytrade":{"configured":false,"enabled":false,"implemented":false,"state":"not_configured"},"finnhub":{"configured":true,"enabled":false,"implemented":false,"state":"disabled_in_demo"}},"tastytrade_environment":"sandbox"}
+HTTP 200
+
+$ curl https://daybook-trade-web.vercel.app/settings
+HTTP 200
+
+$ curl https://daybook-trade-web.vercel.app/api/prices
+{"as_of":"2026-07-30T05:23:15.796410Z","feed":"iex","status":"unavailable","market_open":false,"quotes":{},"indices":{},"error":{"code":"MARKET_DATA_UNAVAILABLE","message":"Alpaca credentials are not configured."}}
+HTTP 503
+```
+
+This cross-cutting availability checkpoint is **PASS**. Phase 1 remains
+**BLOCKED** because its VERIFY gate requires real Alpaca quote/bar values.
+Phase 2 has not been started, in accordance with G10.

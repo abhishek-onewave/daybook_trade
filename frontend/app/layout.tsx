@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { SiteHeader } from "@/components/site-header";
+import { environmentFlag } from "@/lib/environment";
 import "@/styles/tokens.css";
 import "./globals.css";
 
@@ -17,7 +18,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const demoMode = process.env.DAYBOOK_DEMO_MODE === "true";
+  const demoMode = environmentFlag(process.env.DAYBOOK_DEMO_MODE);
 
   return (
     <html lang="en">

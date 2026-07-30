@@ -1,3 +1,5 @@
+import { environmentFlag } from "@/lib/environment";
+
 const HOP_BY_HOP_HEADERS = [
   "connection",
   "keep-alive",
@@ -10,7 +12,7 @@ const HOP_BY_HOP_HEADERS = [
   "upgrade",
 ];
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
-const DEMO_MODE = process.env.DAYBOOK_DEMO_MODE === "true";
+const DEMO_MODE = environmentFlag(process.env.DAYBOOK_DEMO_MODE);
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 function proxyHeaders(source: Headers) {

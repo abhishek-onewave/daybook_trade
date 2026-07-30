@@ -48,16 +48,25 @@ def test_vercel_demo_uses_ephemeral_sqlite_without_an_api_token() -> None:
     assert settings.requires_api_token is False
 
 
-def test_demo_mode_refuses_to_connect_to_postgres() -> None:
+def test_demo_mode_ignores_postgres_and_provider_credentials() -> None:
     settings = Settings(
         _env_file=None,
         vercel=True,
         daybook_demo_mode=True,
         database_url="postgresql://postgres:secret@pooler.example:6543/postgres",
+        anthropic_api_key="configured-anthropic",
+        alpaca_api_key_id="configured-alpaca",
+        alpaca_api_secret_key="configured-alpaca-secret",
+        finnhub_api_key="configured-finnhub",
     )
 
-    with pytest.raises(ValueError, match="Disable DAYBOOK_DEMO_MODE"):
-        settings.sqlalchemy_database_url
+    assert settings.sqlalchemy_database_url == "sqlite:////tmp/daybook-demo.db"
+    assert settings.anthropic_configured is True
+    assert settings.anthropic_enabled is False
+    assert settings.alpaca_configured is True
+    assert settings.alpaca_enabled is False
+    assert settings.finnhub_configured is True
+    assert settings.finnhub_enabled is False
 
 
 def test_vercel_database_url_enforces_tls() -> None:

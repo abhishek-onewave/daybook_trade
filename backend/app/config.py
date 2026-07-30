@@ -60,12 +60,9 @@ class Settings(BaseSettings):
     @property
     def sqlalchemy_database_url(self) -> str:
         if self.daybook_demo_mode:
-            if self.uses_postgres:
-                raise ValueError(
-                    "Disable DAYBOOK_DEMO_MODE before connecting Supabase Postgres."
-                )
             if self.is_deployed:
                 return "sqlite:////tmp/daybook-demo.db"
+            return "sqlite:///./data/daybook.db"
         if self.is_deployed and not self.uses_postgres:
             raise ValueError("DATABASE_URL must use Supabase Postgres in production.")
         database_url = self.database_url
@@ -94,16 +91,32 @@ class Settings(BaseSettings):
         return bool(self.anthropic_api_key)
 
     @property
+    def anthropic_enabled(self) -> bool:
+        return self.anthropic_configured and not self.daybook_demo_mode
+
+    @property
     def alpaca_configured(self) -> bool:
         return bool(self.alpaca_api_key_id and self.alpaca_api_secret_key)
+
+    @property
+    def alpaca_enabled(self) -> bool:
+        return self.alpaca_configured and not self.daybook_demo_mode
 
     @property
     def tastytrade_configured(self) -> bool:
         return bool(self.tastytrade_client_id and self.tastytrade_client_secret)
 
     @property
+    def tastytrade_enabled(self) -> bool:
+        return self.tastytrade_configured and not self.daybook_demo_mode
+
+    @property
     def finnhub_configured(self) -> bool:
         return bool(self.finnhub_api_key)
+
+    @property
+    def finnhub_enabled(self) -> bool:
+        return self.finnhub_configured and not self.daybook_demo_mode
 
 
 @lru_cache

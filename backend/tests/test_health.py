@@ -15,6 +15,7 @@ def test_health_reports_database_and_config_booleans() -> None:
     assert payload["mode"] == "live"
     assert payload["database"]["configured"] is True
     assert payload["database"]["connected"] is True
+    assert payload["database"]["persistent"] is False
     assert isinstance(payload["integrations"]["anthropic_configured"], bool)
     assert isinstance(payload["integrations"]["alpaca_configured"], bool)
     assert isinstance(payload["integrations"]["tastytrade_configured"], bool)
@@ -88,3 +89,30 @@ def test_deployed_demo_health_is_public_and_identifies_demo_mode() -> None:
 
     assert response.status_code == 200
     assert response.json()["mode"] == "demo"
+
+
+def test_health_reports_independent_provider_capabilities() -> None:
+    settings = Settings(
+        _env_file=None,
+        anthropic_api_key="configured-anthropic",
+        alpaca_api_key_id="configured-alpaca",
+        alpaca_api_secret_key="configured-alpaca-secret",
+        finnhub_api_key="configured-finnhub",
+    )
+    with (
+        patch("backend.app.main.get_settings", return_value=settings),
+        patch("backend.app.routers.health.get_settings", return_value=settings),
+        TestClient(app) as client,
+    ):
+        response = client.get("/api/health")
+
+    capabilities = response.json()["capabilities"]
+    assert capabilities["alpaca"] == {
+        "configured": True,
+        "enabled": True,
+        "implemented": True,
+        "state": "ready",
+    }
+    assert capabilities["anthropic"]["state"] == "pending_phase"
+    assert capabilities["finnhub"]["state"] == "pending_phase"
+    assert capabilities["tastytrade"]["state"] == "not_configured"

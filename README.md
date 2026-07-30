@@ -97,9 +97,10 @@ To inspect the application shell before connecting any provider, set only
 This explicit preview mode is public, labels itself in the UI and health
 response, and stores only seeded demo state in ephemeral Vercel `/tmp` SQLite.
 Market, AI, brokerage, news, and portfolio data remain unavailable rather than
-being fabricated. Preview mode refuses to connect to Postgres, so remove
-`DAYBOOK_DEMO_MODE` before adding `DATABASE_URL`, Supabase, broker, AI,
-API-token, or access-password configuration.
+being fabricated. Preview mode does not connect to a configured Postgres
+database and does not activate configured providers, preventing public use of
+paid credentials. Remove `DAYBOOK_DEMO_MODE` before enabling persistent data
+and real integrations.
 
 For the credential-backed deployment, configure all server-only variables once
 in `daybook-trade-web`:
@@ -116,6 +117,13 @@ in `daybook-trade-web`:
 | `TASTYTRADE_CLIENT_ID`, `TASTYTRADE_CLIENT_SECRET`, `TASTYTRADE_ENV` | Read-only Tastytrade OAuth |
 | `FINNHUB_API_KEY` | Finnhub news |
 | `DAYBOOK_DAILY_CHAT_CAP=300` | Optional daily chat limit |
+
+Provider variables are independently optional. In live mode, Daybook activates
+an implemented integration only when that provider's complete credential set
+is present. Missing provider credentials never block the Web app, database, or
+other providers; affected pages return and render an honest unavailable state.
+The Settings page reports each provider as ready, not connected,
+preview-disabled, or pending its gated implementation.
 
 Generate separate strong values for the internal API token, encryption key,
 and human access password:
