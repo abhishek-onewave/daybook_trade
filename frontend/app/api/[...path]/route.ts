@@ -10,6 +10,7 @@ const HOP_BY_HOP_HEADERS = [
   "upgrade",
 ];
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const DEMO_MODE = process.env.DAYBOOK_DEMO_MODE === "true";
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 function proxyHeaders(source: Headers) {
@@ -30,9 +31,12 @@ function gatewayConfig() {
   const configuredOrigin = process.env.DAYBOOK_API_ORIGIN?.trim();
   const token = process.env.DAYBOOK_API_TOKEN?.trim();
 
-  if (IS_PRODUCTION && (!configuredOrigin || !token || token.length < 32)) {
+  if (
+    IS_PRODUCTION &&
+    (!configuredOrigin || (!DEMO_MODE && (!token || token.length < 32)))
+  ) {
     throw new Error(
-      "A secure DAYBOOK_API_ORIGIN and DAYBOOK_API_TOKEN are required in production.",
+      "A secure DAYBOOK_API_ORIGIN and, outside demo mode, DAYBOOK_API_TOKEN are required in production.",
     );
   }
 

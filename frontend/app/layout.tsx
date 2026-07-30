@@ -17,9 +17,17 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const demoMode = process.env.DAYBOOK_DEMO_MODE === "true";
+
   return (
     <html lang="en">
       <body>
+        {demoMode ? (
+          <div className="demo-banner" role="status">
+            Preview mode · Live market, AI, brokerage, and Supabase connections
+            are not configured.
+          </div>
+        ) : null}
         <SiteHeader />
         <main>{children}</main>
         <footer className="site-footer">
@@ -29,4 +37,3 @@ export default function RootLayout({
     </html>
   );
 }
-

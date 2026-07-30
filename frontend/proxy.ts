@@ -4,6 +4,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 const USERNAME = "daybook";
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const DEMO_MODE = process.env.DAYBOOK_DEMO_MODE === "true";
 
 function matches(expected: string, actual: string) {
   const expectedBytes = Buffer.from(expected);
@@ -42,7 +43,7 @@ export function proxy(request: NextRequest) {
     );
   }
 
-  if (IS_PRODUCTION && (!password || password.length < 16)) {
+  if (IS_PRODUCTION && !DEMO_MODE && (!password || password.length < 16)) {
     console.error(
       "DAYBOOK_ACCESS_PASSWORD must be at least 16 characters in production.",
     );

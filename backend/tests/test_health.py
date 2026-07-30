@@ -12,6 +12,7 @@ def test_health_reports_database_and_config_booleans() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
+    assert payload["mode"] == "live"
     assert payload["database"]["configured"] is True
     assert payload["database"]["connected"] is True
     assert isinstance(payload["integrations"]["anthropic_configured"], bool)
@@ -70,3 +71,20 @@ def test_configured_token_is_enforced_during_local_development() -> None:
 
     assert denied.status_code == 401
     assert allowed.status_code == 200
+
+
+def test_deployed_demo_health_is_public_and_identifies_demo_mode() -> None:
+    settings = Settings(
+        _env_file=None,
+        app_environment="production",
+        daybook_demo_mode=True,
+    )
+    with (
+        patch("backend.app.main.get_settings", return_value=settings),
+        patch("backend.app.routers.health.get_settings", return_value=settings),
+        TestClient(app) as client,
+    ):
+        response = client.get("/api/health")
+
+    assert response.status_code == 200
+    assert response.json()["mode"] == "demo"

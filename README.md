@@ -82,8 +82,24 @@ Next.js runtimes can deploy independently:
 
 | Vercel project | Production URL | Root | Required environment |
 | --- | --- | --- | --- |
-| `daybook-trade` | `https://daybook-trade-one-wave.vercel.app` | `.` | `APP_ENVIRONMENT=production`, `DATABASE_URL`, `DAYBOOK_API_TOKEN`, `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET_KEY`, and later-phase backend secrets |
-| `daybook-trade-web` | `https://daybook-trade-web.vercel.app` | `frontend` | `DAYBOOK_API_ORIGIN=https://daybook-trade-one-wave.vercel.app`, the same `DAYBOOK_API_TOKEN`, and `DAYBOOK_ACCESS_PASSWORD` |
+| `daybook-trade` | `https://daybook-trade.vercel.app` | `.` | `APP_ENVIRONMENT=production`, `DATABASE_URL`, `DAYBOOK_API_TOKEN`, `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET_KEY`, and later-phase backend secrets |
+| `daybook-trade-web` | `https://daybook-trade-web.vercel.app` | `frontend` | `DAYBOOK_API_ORIGIN=https://daybook-trade.vercel.app`, the same `DAYBOOK_API_TOKEN`, and `DAYBOOK_ACCESS_PASSWORD` |
+
+### Temporary zero-credential preview
+
+To inspect the application shell before connecting any provider, set only:
+
+| Vercel project | Environment variables |
+| --- | --- |
+| `daybook-trade` | `DAYBOOK_DEMO_MODE=true` |
+| `daybook-trade-web` | `DAYBOOK_DEMO_MODE=true`, `DAYBOOK_API_ORIGIN=https://daybook-trade.vercel.app` |
+
+This explicit preview mode is public, labels itself in the UI and health
+response, and stores only seeded demo state in ephemeral Vercel `/tmp` SQLite.
+Market, AI, brokerage, news, and portfolio data remain unavailable rather than
+being fabricated. Preview mode refuses to connect to Postgres, so remove
+`DAYBOOK_DEMO_MODE` from both projects before adding `DATABASE_URL`, Supabase,
+broker, AI, API-token, or access-password configuration.
 
 Deploy the API first, set its stable HTTPS domain in the Web project, and then
 deploy the Web project. Generate separate strong values for the internal API

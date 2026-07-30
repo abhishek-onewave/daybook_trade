@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/daybook.db"
     secret_key: str = ""
     daybook_api_token: str = ""
+    daybook_demo_mode: bool = False
     vercel: bool = False
 
     @property
@@ -45,12 +46,21 @@ class Settings(BaseSettings):
 
     @property
     def requires_api_token(self) -> bool:
+        if self.daybook_demo_mode:
+            return False
         # Supabase-backed local runs are protected too, so a missing optional
         # Vercel system variable cannot expose the production API.
         return bool(self.daybook_api_token) or self.is_deployed or self.uses_postgres
 
     @property
     def sqlalchemy_database_url(self) -> str:
+        if self.daybook_demo_mode:
+            if self.uses_postgres:
+                raise ValueError(
+                    "Disable DAYBOOK_DEMO_MODE before connecting Supabase Postgres."
+                )
+            if self.is_deployed:
+                return "sqlite:////tmp/daybook-demo.db"
         if self.is_deployed and not self.uses_postgres:
             raise ValueError("DATABASE_URL must use Supabase Postgres in production.")
         database_url = self.database_url

@@ -818,3 +818,88 @@ Gate result remains **BLOCKED**. Both Vercel runtimes now build, but neither
 project has environment variables, no dedicated Daybook Supabase project
 exists in the connected account, and the Phase 1 gate still lacks real Alpaca
 quote/bar output. Phase 2 has not been started.
+
+### Zero-credential Vercel preview
+
+An explicit `DAYBOOK_DEMO_MODE=true` path was added so the application can be
+inspected before Supabase or provider credentials are configured. In deployed
+demo mode the API migrates a temporary `/tmp/daybook-demo.db`, skips provider
+pollers and authentication secrets, labels health output as demo, and refuses
+to connect to a Postgres URL. The Web project displays a preview banner and
+keeps missing integration data unavailable rather than generating sample
+market values.
+
+Automated verification:
+
+```text
+$ make test
+..........................                                               [100%]
+26 passed, 1 warning in 0.47s
+
+$ make guard
+.                                                                        [100%]
+1 passed in 0.01s
+All checks passed!
+
+$ cd frontend && npm run build
+✓ Compiled successfully in 1577ms
+Finished TypeScript in 1278ms
+✓ Generating static pages using 7 workers (10/10) in 155ms
+```
+
+The production API deployment completed with:
+
+```text
+Using Python 3.12 from .python-version
+Installing required dependencies from requirements.txt...
+Compiling Python bytecode...
+Build Completed in /vercel/output [3s]
+Deployment completed
+Aliased https://daybook-trade.vercel.app
+Ready in 25s
+```
+
+Real public API checks:
+
+```text
+$ curl https://daybook-trade.vercel.app/api/health
+{"status":"ok","mode":"demo","as_of":"2026-07-30T02:20:32.428526Z","database":{"configured":true,"connected":true},"integrations":{"anthropic_configured":false,"alpaca_configured":false,"tastytrade_configured":false,"finnhub_configured":false},"tastytrade_environment":"sandbox"}
+HTTP 200
+
+$ curl https://daybook-trade.vercel.app/api/prices
+{"as_of":"2026-07-30T02:20:32.768632Z","feed":"iex","status":"unavailable","market_open":false,"quotes":{},"indices":{},"error":{"code":"MARKET_DATA_UNAVAILABLE","message":"Alpaca credentials are not configured."}}
+HTTP 503
+```
+
+The production Web deployment completed with:
+
+```text
+Detected Next.js version: 16.2.12
+✓ Compiled successfully in 3.4s
+Finished TypeScript in 2.9s
+✓ Generating static pages using 3 workers (10/10) in 261ms
+Build Completed in /vercel/output [10s]
+Deployment completed
+Aliased https://daybook-trade-web.vercel.app
+Ready in 28s
+```
+
+Real public Web and Web-gateway checks:
+
+```text
+$ curl https://daybook-trade-web.vercel.app/
+WEB / HTTP 200
+Preview mode · Live market, AI, brokerage, and Supabase connections are not configured.
+
+$ curl https://daybook-trade-web.vercel.app/api/health
+{"status":"ok","mode":"demo","as_of":"2026-07-30T02:21:47.556301Z","database":{"configured":true,"connected":true},"integrations":{"anthropic_configured":false,"alpaca_configured":false,"tastytrade_configured":false,"finnhub_configured":false},"tastytrade_environment":"sandbox"}
+HTTP 200
+
+$ curl https://daybook-trade-web.vercel.app/api/prices
+{"as_of":"2026-07-30T02:21:47.951137Z","feed":"iex","status":"unavailable","market_open":false,"quotes":{},"indices":{},"error":{"code":"MARKET_DATA_UNAVAILABLE","message":"Alpaca credentials are not configured."}}
+HTTP 503
+```
+
+The zero-credential preview is **PASS** and the app shell is publicly
+inspectable. The Phase 1 gate remains **BLOCKED** because its contract requires
+real Alpaca quote/bar values; Phase 2 has not been started.

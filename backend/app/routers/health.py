@@ -25,6 +25,7 @@ class DatabaseStatus(BaseModel):
 
 class HealthResponse(BaseModel):
     status: Literal["ok", "degraded"]
+    mode: Literal["demo", "live"]
     as_of: datetime
     database: DatabaseStatus
     integrations: IntegrationStatus
@@ -44,6 +45,7 @@ def health() -> HealthResponse:
 
     return HealthResponse(
         status="ok" if database_connected else "degraded",
+        mode="demo" if settings.daybook_demo_mode else "live",
         as_of=datetime.now(UTC),
         database=DatabaseStatus(
             configured=bool(settings.database_url),
@@ -57,4 +59,3 @@ def health() -> HealthResponse:
         ),
         tastytrade_environment=settings.tastytrade_env,
     )
-

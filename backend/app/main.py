@@ -15,7 +15,7 @@ from backend.app.services.alpaca import AlpacaClient, run_quote_poller
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
-    if not settings.is_deployed:
+    if not settings.is_deployed or settings.daybook_demo_mode:
         run_migrations()
 
     app.state.alpaca_client = None
@@ -23,7 +23,11 @@ async def lifespan(app: FastAPI):
     app.state.quote_poller_stop = asyncio.Event()
     app.state.quote_poller_task = None
 
-    if settings.alpaca_configured and not settings.is_deployed:
+    if (
+        settings.alpaca_configured
+        and not settings.is_deployed
+        and not settings.daybook_demo_mode
+    ):
         client = AlpacaClient(settings)
         app.state.alpaca_client = client
         app.state.quote_poller_task = asyncio.create_task(

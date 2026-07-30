@@ -41,6 +41,25 @@ def test_vercel_rejects_ephemeral_sqlite() -> None:
         Settings(_env_file=None, vercel=True).sqlalchemy_database_url
 
 
+def test_vercel_demo_uses_ephemeral_sqlite_without_an_api_token() -> None:
+    settings = Settings(_env_file=None, vercel=True, daybook_demo_mode=True)
+
+    assert settings.sqlalchemy_database_url == "sqlite:////tmp/daybook-demo.db"
+    assert settings.requires_api_token is False
+
+
+def test_demo_mode_refuses_to_connect_to_postgres() -> None:
+    settings = Settings(
+        _env_file=None,
+        vercel=True,
+        daybook_demo_mode=True,
+        database_url="postgresql://postgres:secret@pooler.example:6543/postgres",
+    )
+
+    with pytest.raises(ValueError, match="Disable DAYBOOK_DEMO_MODE"):
+        settings.sqlalchemy_database_url
+
+
 def test_vercel_database_url_enforces_tls() -> None:
     secure = Settings(
         _env_file=None,

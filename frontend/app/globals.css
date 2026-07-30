@@ -17,6 +17,16 @@ body {
   line-height: 1.55;
 }
 
+.demo-banner {
+  background: #fff3ca;
+  border-bottom: 1px solid #e7ce77;
+  color: #493a0b;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 24px;
+  text-align: center;
+}
+
 button,
 a {
   font: inherit;

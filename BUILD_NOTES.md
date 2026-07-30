@@ -1,5 +1,17 @@
 # Build Notes
 
+## Zero-credential Vercel preview
+
+`DAYBOOK_DEMO_MODE=true` is an explicit temporary deployment mode for viewing
+the application before credentials are configured. The API migrates a
+throwaway SQLite database at `/tmp/daybook-demo.db`, disables the internal API
+token requirement, does not start provider pollers, and refuses any Postgres
+`DATABASE_URL`. The Web project skips Basic authentication only in this mode,
+still requires an HTTPS API origin, and displays a persistent preview banner.
+
+Remove the variable from both Vercel projects before connecting Supabase or any
+real provider. Demo mode is intentionally public and ephemeral.
+
 ## Phase 0
 
 - The workspace began empty and was not a Git repository.
