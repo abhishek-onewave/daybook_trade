@@ -51,13 +51,20 @@ disclosing credential values.
 
 ## Supabase database
 
-Use a dedicated Supabase project for Daybook. In its **Connect** panel, copy
-the transaction-pooler connection string on port `6543`, require SSL, and set
-it as the backend's `DATABASE_URL`. Keep that URL backend-only; it contains the
-database password.
+Use a dedicated Supabase project for Daybook. It provides two connection URLs
+for two different jobs:
 
-Before the first deployment, put the Supabase URL in the private root `.env`
-and apply the schema once:
+- **Vercel runtime:** use the transaction-pooler URL on port `6543` as the API
+  project's `DATABASE_URL`. Daybook adds `sslmode=require` when absent and
+  rejects weaker TLS modes. For certificate and hostname verification, install
+  the project's CA certificate and use `sslmode=verify-full`.
+- **Migrations:** use the direct connection URL on port `5432` in the private
+  local `.env`. If the migration machine cannot reach Supabase over IPv6, use
+  the session-pooler URL on port `5432` instead. Do not run Alembic through the
+  transaction pooler. Daybook enforces the same TLS rule for this URL.
+
+Before the first deployment, set the migration URL locally and apply the
+schema once:
 
 ```bash
 make migrate
@@ -74,31 +81,52 @@ Create two Vercel projects from this repository:
 
 | Project | Root directory | Required environment |
 | --- | --- | --- |
-| Daybook API | `.` | `DATABASE_URL`, `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET_KEY`, and later-phase backend secrets |
-| Daybook Web | `frontend` | `DAYBOOK_API_ORIGIN=https://<daybook-api-domain>` |
+| Daybook API | `.` | `APP_ENVIRONMENT=production`, `DATABASE_URL`, `DAYBOOK_API_TOKEN`, `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET_KEY`, and later-phase backend secrets |
+| Daybook Web | `frontend` | `DAYBOOK_API_ORIGIN=https://<daybook-api-domain>`, the same `DAYBOOK_API_TOKEN`, and `DAYBOOK_ACCESS_PASSWORD` |
 
 Deploy the API first, set its stable HTTPS domain in the Web project, and then
-deploy the Web project. The browser continues to call relative `/api/*` URLs;
-Next.js proxies those requests to the API without exposing backend secrets or
-requiring production CORS.
+deploy the Web project. Generate separate strong values for the internal API
+token and the human access password:
 
-Vercel sets `VERCEL=1` automatically. In that runtime Daybook does not run
-Alembic or a continuous background poller during function startup. Quotes
-refresh on demand through `/api/prices`, while local development retains the
-specified 15/60-second poller.
+```bash
+python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
+```
+
+The Web project requires HTTP Basic authentication over HTTPS (username
+`daybook`, password `DAYBOOK_ACCESS_PASSWORD`) and proxies relative `/api/*`
+requests server-side. The proxy adds `DAYBOOK_API_TOKEN`; direct API requests
+without that token are rejected. Neither secret is exposed through a
+`NEXT_PUBLIC_` variable. Unsafe Web gateway methods also require an exact
+same-origin `Origin` header so later write routes cannot inherit Basic-auth
+CSRF exposure. Vercel Authentication on **All Deployments** can be
+enabled as an additional platform-level gate on the **Web project only** when
+the account plan supports it. Leave that platform gate off on the API project:
+the cross-project Web gateway authenticates to FastAPI with
+`DAYBOOK_API_TOKEN`, not a Vercel Authentication cookie or bypass secret.
+
+`APP_ENVIRONMENT=production` is an app-owned deployment marker, so security
+does not depend on Vercel's optional system-environment exposure setting.
+Production rejects SQLite, requires the port-6543 transaction pooler, TLS, and
+the internal API token; Supabase-backed local API runs require the token too.
+Production does not run Alembic or a continuous background poller during
+function startup. Quotes refresh on demand through `/api/prices`, while local
+SQLite development retains the specified 15/60-second poller.
 
 After both deployments:
 
 ```bash
-curl https://<daybook-api-domain>/api/health
-curl https://<daybook-web-domain>/api/prices
-curl 'https://<daybook-web-domain>/api/bars?symbol=NVDA&range=1M'
+curl -H "x-daybook-api-token: $DAYBOOK_API_TOKEN" \
+  https://<daybook-api-domain>/api/health
+curl -u "daybook:$DAYBOOK_ACCESS_PASSWORD" \
+  https://<daybook-web-domain>/api/prices
+curl -u "daybook:$DAYBOOK_ACCESS_PASSWORD" \
+  'https://<daybook-web-domain>/api/bars?symbol=NVDA&range=1M'
 ```
 
 Log the actual responses in `WORKLOG.md`; Phase 1 passes only when those calls
-and the deployed UI show real Alpaca values. The application does not yet have
-a user-authentication layer, so keep deployments private until a single-user
-access gate exists—especially before portfolio or chat data is added.
+and the deployed UI show real Alpaca values. Basic authentication is the
+deliberately small single-user gate for v1; replace it with managed identity
+and session auth before Daybook ever becomes multi-user.
 
 ## Alpaca market data
 

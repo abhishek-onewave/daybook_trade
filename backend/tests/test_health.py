@@ -1,3 +1,6 @@
+from unittest.mock import patch
+
+from backend.app.config import Settings
 from backend.app.main import app
 from fastapi.testclient import TestClient
 
@@ -16,3 +19,54 @@ def test_health_reports_database_and_config_booleans() -> None:
     assert isinstance(payload["integrations"]["tastytrade_configured"], bool)
     assert isinstance(payload["integrations"]["finnhub_configured"], bool)
 
+
+def test_vercel_requests_require_the_shared_api_token() -> None:
+    settings = Settings(
+        _env_file=None,
+        app_environment="production",
+        database_url="postgresql://postgres:secret@pooler.example:6543/postgres",
+        daybook_api_token="internal-test-token-that-is-long-enough",
+    )
+    with (
+        patch("backend.app.main.get_settings", return_value=settings),
+        TestClient(app) as client,
+    ):
+        denied = client.get("/api/health")
+        allowed = client.get(
+            "/api/health",
+            headers={"x-daybook-api-token": "internal-test-token-that-is-long-enough"},
+        )
+
+    assert denied.status_code == 401
+    assert denied.json() == {"detail": "Unauthorized."}
+    assert allowed.status_code == 200
+
+    settings.daybook_api_token = ""
+    with (
+        patch("backend.app.main.get_settings", return_value=settings),
+        TestClient(app) as client,
+    ):
+        misconfigured = client.get("/api/health")
+    assert misconfigured.status_code == 503
+    assert misconfigured.json() == {
+        "detail": "DAYBOOK_API_TOKEN is not securely configured."
+    }
+
+
+def test_configured_token_is_enforced_during_local_development() -> None:
+    settings = Settings(
+        _env_file=None,
+        daybook_api_token="local-test-token-that-is-long-enough",
+    )
+    with (
+        patch("backend.app.main.get_settings", return_value=settings),
+        TestClient(app) as client,
+    ):
+        denied = client.get("/api/health")
+        allowed = client.get(
+            "/api/health",
+            headers={"x-daybook-api-token": "local-test-token-that-is-long-enough"},
+        )
+
+    assert denied.status_code == 401
+    assert allowed.status_code == 200

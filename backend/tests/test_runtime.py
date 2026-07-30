@@ -6,10 +6,11 @@ from backend.app.main import lifespan
 from fastapi import FastAPI
 
 
-def test_vercel_lifespan_skips_migrations_and_background_poller() -> None:
+def test_production_lifespan_skips_migrations_and_background_poller() -> None:
     settings = Settings(
         _env_file=None,
-        vercel=True,
+        app_environment="production",
+        database_url="postgresql://postgres:secret@pooler.example:6543/postgres",
         alpaca_api_key_id="test-key",
         alpaca_api_secret_key="test-secret",
     )

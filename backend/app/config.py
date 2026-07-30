@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -9,6 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 MODEL_FLAGSHIP = "claude-fable-5"
 MODEL_STANDARD = "claude-sonnet-4-6"
 MODEL_LIGHT = "claude-haiku-4-5-20251001"
+POSTGRES_SCHEMES = ("postgres://", "postgresql://", "postgresql+psycopg://")
 
 
 class Settings(BaseSettings):
@@ -30,18 +32,47 @@ class Settings(BaseSettings):
     daybook_daily_chat_cap: int = Field(default=300, ge=1)
     database_url: str = "sqlite:///./data/daybook.db"
     secret_key: str = ""
+    daybook_api_token: str = ""
     vercel: bool = False
 
     @property
+    def is_deployed(self) -> bool:
+        return self.vercel or self.app_environment.casefold() == "production"
+
+    @property
+    def uses_postgres(self) -> bool:
+        return self.database_url.startswith(POSTGRES_SCHEMES)
+
+    @property
+    def requires_api_token(self) -> bool:
+        # Supabase-backed local runs are protected too, so a missing optional
+        # Vercel system variable cannot expose the production API.
+        return bool(self.daybook_api_token) or self.is_deployed or self.uses_postgres
+
+    @property
     def sqlalchemy_database_url(self) -> str:
-        postgres_schemes = ("postgres://", "postgresql://", "postgresql+psycopg://")
-        if self.vercel and not self.database_url.startswith(postgres_schemes):
-            raise ValueError("DATABASE_URL must use Supabase Postgres on Vercel.")
-        if self.database_url.startswith("postgres://"):
-            return self.database_url.replace("postgres://", "postgresql+psycopg://", 1)
-        if self.database_url.startswith("postgresql://"):
-            return self.database_url.replace("postgresql://", "postgresql+psycopg://", 1)
-        return self.database_url
+        if self.is_deployed and not self.uses_postgres:
+            raise ValueError("DATABASE_URL must use Supabase Postgres in production.")
+        database_url = self.database_url
+        if database_url.startswith("postgres://"):
+            database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
+        elif database_url.startswith("postgresql://"):
+            database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+        if not database_url.startswith("postgresql+psycopg://"):
+            return database_url
+
+        parsed = urlsplit(database_url)
+        if self.is_deployed and parsed.port != 6543:
+            raise ValueError(
+                "DATABASE_URL must use the Supabase transaction pooler on port 6543 "
+                "in production."
+            )
+        query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+        sslmode = query.get("sslmode", "").lower()
+        if sslmode and sslmode not in {"require", "verify-ca", "verify-full"}:
+            raise ValueError("PostgreSQL DATABASE_URL must enforce TLS.")
+        query["sslmode"] = sslmode or "require"
+        return urlunsplit(parsed._replace(query=urlencode(query)))
 
     @property
     def anthropic_configured(self) -> bool:

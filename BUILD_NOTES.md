@@ -78,6 +78,15 @@
   <https://supabase.com/docs/guides/troubleshooting/using-sqlalchemy-with-supabase-FUqebT>
   and
   <https://supabase.com/docs/guides/troubleshooting/disabling-prepared-statements-qL8lEL>.
+- All PostgreSQL connections enforce TLS in code: URLs without `sslmode`
+  receive `sslmode=require`, and optional or disabled modes are rejected.
+  Supabase recommends `verify-full` with the project's CA certificate when SSL
+  enforcement is enabled:
+  <https://supabase.com/docs/guides/platform/ssl-enforcement>.
+- Alembic uses Supabase's direct port-5432 connection for migrations, with the
+  session pooler as the IPv4 fallback. Only Vercel function traffic uses the
+  transaction pooler on port 6543, following Supabase's connection matrix:
+  <https://supabase.com/docs/guides/database/connecting-to-postgres>.
 - A PostgreSQL-only migration enables RLS without Data API policies on all
   public application tables. The backend owner connection retains access,
   while Supabase `anon` and `authenticated` roles receive none. This remains
@@ -98,6 +107,20 @@
   at startup. Schema migration is an explicit release operation, and the
   existing request-driven quote refresh supplies fresh data in serverless
   execution. Local development keeps the required 15/60-second poller.
+- The two-project deployment is private by default without adding an auth
+  dependency: the Web project uses HTTPS Basic authentication for the single
+  user, its server-side `/api` gateway injects a separate shared API token, and
+  FastAPI rejects direct tokenless requests. This avoids placing either secret
+  in browser JavaScript and keeps production CORS unnecessary.
+- The Web gateway requires an exact same-origin `Origin` header for unsafe
+  methods and rejects contrary `Sec-Fetch-Site` metadata, preventing Basic-auth
+  CSRF before later phases add mutation routes.
+- Optional Vercel Authentication belongs on the Web project only. Enabling it
+  on the API project would challenge the Web project's server-side fetch unless
+  a separate Vercel automation-bypass secret and header were configured.
+- `APP_ENVIRONMENT=production` is the app-owned deployment marker. It makes
+  the API fail closed even when Vercel's optional system environment variables
+  are not exposed; Supabase-backed local runs also require the internal token.
 - The attached Ponytail 4.8.4 development rules were applied in `full` mode:
   existing SQLAlchemy/Alembic and the native Vercel/Next.js features were
   reused, and no Supabase SDK, scheduler replacement, monorepo framework, or

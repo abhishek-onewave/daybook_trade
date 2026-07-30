@@ -521,3 +521,212 @@ Gate result remains **BLOCKED**. Supabase/Vercel compatibility is supported by
 real local and generated-SQL evidence, but the Phase 1 gate still requires a
 deployed or local environment containing real Alpaca credentials. Phase 2 has
 not been started.
+
+### Security and deployment follow-up
+
+The Vercel adaptation was independently reviewed and hardened before commit.
+This supersedes the earlier external `next.config.mjs` rewrite with a
+credential-injecting server-side route:
+
+- Every PostgreSQL URL, including the direct/session-pooler migration URL,
+  receives `sslmode=require` when absent and rejects weaker modes.
+- `APP_ENVIRONMENT=production` is an app-owned serverless marker; the
+  production API requires Supabase's port-6543 transaction pooler and rejects
+  SQLite. PostgreSQL-backed or explicitly token-configured local API runs also
+  enforce the internal token.
+- The Web deployment uses HTTPS Basic authentication and a server-side
+  `/api/[...path]` gateway. Browser `Authorization`, cookies, and forged
+  Daybook tokens are removed before the configured internal token is added.
+- Production rejects plain HTTP, an HTTP API origin, weak or absent secrets,
+  cross-origin API redirects, and backend `Set-Cookie` leakage. Same-origin
+  redirects remain inside the authenticated Web gateway.
+- Unsafe gateway methods fail closed unless browser origin metadata is exactly
+  same-origin, preventing later mutation routes from inheriting Basic-auth
+  CSRF exposure.
+
+Command:
+
+```text
+$ make test
+```
+
+Actual output:
+
+```text
+.venv/bin/alembic -c backend/alembic.ini upgrade head
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+.venv/bin/python -m pytest backend/tests
+......................                                                   [100%]
+22 passed, 1 warning in 0.45s
+cd frontend && npm run lint
+
+> daybook-frontend@0.1.0 lint
+> eslint .
+```
+
+Command:
+
+```text
+$ make guard
+```
+
+Actual output:
+
+```text
+.venv/bin/python -m pytest backend/tests/test_read_only_guard.py
+.                                                                        [100%]
+1 passed in 0.01s
+.venv/bin/ruff check backend
+All checks passed!
+cd frontend && npm run lint
+
+> daybook-frontend@0.1.0 lint
+> eslint .
+```
+
+Command:
+
+```text
+$ cd frontend
+$ DAYBOOK_API_ORIGIN=https://api.example.test \
+  DAYBOOK_API_TOKEN=<test-only-token> \
+  DAYBOOK_ACCESS_PASSWORD=<test-only-password> npm run build
+```
+
+Relevant actual output:
+
+```text
+✓ Compiled successfully in 1363ms
+✓ Finished TypeScript in 1340ms
+✓ Generating static pages using 7 workers (10/10) in 141ms
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/[...path]
+├ ○ /ask
+├ ○ /dashboard
+├ ○ /favorites
+├ ○ /news
+├ ○ /portfolio
+├ ○ /settings
+├ ○ /stats
+└ ƒ /stock/[sym]
+
+ƒ Proxy (Middleware)
+```
+
+Command:
+
+```text
+$ DATABASE_URL='postgresql://postgres:test@db.example:5432/postgres' \
+  .venv/bin/python -c '<print normalized SQLAlchemy URL>'
+```
+
+Actual output:
+
+```text
+postgresql+psycopg://postgres:test@db.example:5432/postgres?sslmode=require
+```
+
+Two real local servers were then started with separate test-only Web and API
+credentials. The values are redacted below.
+
+Command:
+
+```text
+$ curl --silent --show-error --write-out '\nHTTP %{http_code}\n' \
+  http://127.0.0.1:3000/api/health
+```
+
+Actual output:
+
+```text
+Authentication required.
+HTTP 401
+```
+
+Command:
+
+```text
+$ curl --silent --show-error --location \
+  --user 'daybook:<test-only-password>' \
+  --header 'x-daybook-api-token: browser-forged-token' \
+  --write-out '\nHTTP %{http_code}\n' \
+  http://127.0.0.1:3000/api/health/
+```
+
+Actual output:
+
+```text
+{"status":"ok","as_of":"2026-07-30T01:27:53.388476Z","database":{"configured":true,"connected":true},"integrations":{"anthropic_configured":false,"alpaca_configured":false,"tastytrade_configured":false,"finnhub_configured":false},"tastytrade_environment":"sandbox"}
+HTTP 200
+```
+
+This successful response proves the gateway replaced the forged browser token
+with its server-only credential and kept the redirect on the Web origin.
+
+Command:
+
+```text
+$ curl --silent --show-error --write-out '\nHTTP %{http_code}\n' \
+  http://127.0.0.1:8000/api/health
+```
+
+Actual output:
+
+```text
+{"detail":"Unauthorized."}
+HTTP 401
+```
+
+Commands:
+
+```text
+$ curl --silent --show-error --request POST \
+  --user 'daybook:<test-only-password>' \
+  --header 'origin: https://evil.example' \
+  --header 'sec-fetch-site: cross-site' \
+  --write-out '\nHTTP %{http_code}\n' \
+  http://127.0.0.1:3000/api/health
+$ curl --silent --show-error --request POST \
+  --user 'daybook:<test-only-password>' \
+  --header 'origin: http://127.0.0.1:3000' \
+  --header 'sec-fetch-site: same-origin' \
+  --write-out '\nHTTP %{http_code}\n' \
+  http://127.0.0.1:3000/api/health
+```
+
+Actual output:
+
+```text
+{"detail":"Cross-site request blocked."}
+HTTP 403
+
+{"detail":"Method Not Allowed"}
+HTTP 405
+```
+
+The same-origin control reached FastAPI and received its expected `405`
+because `/api/health` is GET-only; the cross-site request was rejected by the
+Web gateway and never reached FastAPI.
+
+The optimized production Web server was also probed over local HTTP. It failed
+closed at both transport boundaries:
+
+```text
+HTTPS is required.
+HTTP 426
+
+{"detail":"Service unavailable."}
+HTTP 503
+```
+
+The first response rejected a plain-HTTP Web request. The second request
+simulated Vercel's HTTPS forwarding header but deliberately configured an HTTP
+API origin; the gateway rejected it before sending the internal token.
+
+Gate result remains **BLOCKED**. These checks pass the Supabase/Vercel security
+checkpoint, but they do not supply the real Alpaca quote and bar output required
+by Phase 1 VERIFY. Phase 2 has not been started.

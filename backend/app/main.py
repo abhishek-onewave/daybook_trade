@@ -1,8 +1,10 @@
 import asyncio
 from contextlib import asynccontextmanager
+from secrets import compare_digest
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from backend.app.config import get_settings
 from backend.app.db import run_migrations
@@ -13,7 +15,7 @@ from backend.app.services.alpaca import AlpacaClient, run_quote_poller
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
-    if not settings.vercel:
+    if not settings.is_deployed:
         run_migrations()
 
     app.state.alpaca_client = None
@@ -21,7 +23,7 @@ async def lifespan(app: FastAPI):
     app.state.quote_poller_stop = asyncio.Event()
     app.state.quote_poller_task = None
 
-    if settings.alpaca_configured and not settings.vercel:
+    if settings.alpaca_configured and not settings.is_deployed:
         client = AlpacaClient(settings)
         app.state.alpaca_client = client
         app.state.quote_poller_task = asyncio.create_task(
@@ -54,6 +56,27 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
     lifespan=lifespan,
 )
+
+
+@app.middleware("http")
+async def require_api_token(request: Request, call_next):
+    settings = get_settings()
+    if not settings.requires_api_token:
+        return await call_next(request)
+    if len(settings.daybook_api_token) < 32:
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "DAYBOOK_API_TOKEN is not securely configured."},
+        )
+    presented = request.headers.get("x-daybook-api-token", "")
+    if not compare_digest(
+        presented.encode("utf-8"),
+        settings.daybook_api_token.encode("utf-8"),
+    ):
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized."})
+    return await call_next(request)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],

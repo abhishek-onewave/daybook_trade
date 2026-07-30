@@ -12,6 +12,7 @@ def test_database_urls_select_psycopg_only_for_plain_postgres_schemes() -> None:
             database_url="postgres://postgres:secret@pooler.example:6543/postgres",
         ).sqlalchemy_database_url
         == "postgresql+psycopg://postgres:secret@pooler.example:6543/postgres"
+        "?sslmode=require"
     )
     assert (
         Settings(
@@ -19,6 +20,7 @@ def test_database_urls_select_psycopg_only_for_plain_postgres_schemes() -> None:
             database_url="postgresql://postgres:secret@pooler.example:6543/postgres",
         ).sqlalchemy_database_url
         == "postgresql+psycopg://postgres:secret@pooler.example:6543/postgres"
+        "?sslmode=require"
     )
     assert (
         Settings(
@@ -26,6 +28,7 @@ def test_database_urls_select_psycopg_only_for_plain_postgres_schemes() -> None:
             database_url="postgresql+psycopg://postgres:secret@pooler.example/postgres",
         ).sqlalchemy_database_url
         == "postgresql+psycopg://postgres:secret@pooler.example/postgres"
+        "?sslmode=require"
     )
     assert (
         Settings(_env_file=None, database_url="sqlite:///./data/daybook.db").sqlalchemy_database_url
@@ -36,6 +39,52 @@ def test_database_urls_select_psycopg_only_for_plain_postgres_schemes() -> None:
 def test_vercel_rejects_ephemeral_sqlite() -> None:
     with pytest.raises(ValueError, match="Supabase Postgres"):
         Settings(_env_file=None, vercel=True).sqlalchemy_database_url
+
+
+def test_vercel_database_url_enforces_tls() -> None:
+    secure = Settings(
+        _env_file=None,
+        vercel=True,
+        database_url="postgresql://postgres:secret@pooler.example:6543/postgres",
+    )
+    assert secure.sqlalchemy_database_url.endswith("?sslmode=require")
+
+    with pytest.raises(ValueError, match="TLS"):
+        Settings(
+            _env_file=None,
+            vercel=True,
+            database_url=(
+                "postgresql://postgres:secret@pooler.example:6543/postgres?sslmode=disable"
+            ),
+        ).sqlalchemy_database_url
+
+
+def test_all_postgres_connections_reject_optional_tls() -> None:
+    with pytest.raises(ValueError, match="TLS"):
+        Settings(
+            _env_file=None,
+            database_url=(
+                "postgresql://postgres:secret@db.example:5432/postgres?sslmode=prefer"
+            ),
+        ).sqlalchemy_database_url
+
+
+def test_production_marker_enforces_serverless_database_contract() -> None:
+    secure = Settings(
+        _env_file=None,
+        app_environment="production",
+        database_url="postgresql://postgres:secret@pooler.example:6543/postgres",
+    )
+    assert secure.is_deployed is True
+    assert secure.requires_api_token is True
+    assert secure.sqlalchemy_database_url.endswith("?sslmode=require")
+
+    with pytest.raises(ValueError, match="port 6543"):
+        Settings(
+            _env_file=None,
+            app_environment="production",
+            database_url="postgresql://postgres:secret@db.example:5432/postgres",
+        ).sqlalchemy_database_url
 
 
 def test_migration_url_preserves_percent_encoded_passwords() -> None:
