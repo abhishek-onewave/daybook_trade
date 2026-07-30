@@ -730,3 +730,91 @@ API origin; the gateway rejected it before sending the internal token.
 Gate result remains **BLOCKED**. These checks pass the Supabase/Vercel security
 checkpoint, but they do not supply the real Alpaca quote and bar output required
 by Phase 1 VERIFY. Phase 2 has not been started.
+
+### Vercel build repair and project split
+
+The user-created `one-wave/daybook-trade` project was inspected after its
+first Git deployment failed.
+
+Command:
+
+```text
+$ vercel inspect https://daybook-trade-hmvgrru5v-one-wave.vercel.app \
+  --logs --scope one-wave
+```
+
+Actual failure:
+
+```text
+Failed to parse "requirements.txt". File content:
+-r backend/requirements.txt
+Error: could not parse requirements.txt: Error parsing included file
+```
+
+The root runtime manifest was changed to list production dependencies directly
+and `.python-version` was set to `3.12`. A real Vercel preview build then
+completed:
+
+```text
+Using Python 3.12 from .python-version
+Using uv 0.10.11
+Installing required dependencies from requirements.txt...
+Compiling Python bytecode...
+Build Completed in /vercel/output [4s]
+Deployment completed
+status  ● Ready
+```
+
+The preview health request deliberately failed closed because the Vercel
+project still has no environment variables:
+
+```text
+$ vercel curl /api/health \
+  --deployment https://daybook-trade-o82puzmth-one-wave.vercel.app
+
+A server error has occurred
+FUNCTION_INVOCATION_FAILED
+HTTP 500
+```
+
+The corresponding real runtime log identifies the missing deployment
+configuration rather than an application-code regression:
+
+```text
+ValueError: DATABASE_URL must use Supabase Postgres in production.
+```
+
+The API-only Vercel project could not serve the Next.js application. A second
+Git-connected project, `one-wave/daybook-trade-web`, was therefore created
+with Root Directory `frontend` and Framework Preset `Next.js`. Its production
+build succeeded:
+
+```text
+Detected Next.js version: 16.2.12
+✓ Compiled successfully in 3.0s
+Finished TypeScript in 2.6s
+✓ Generating static pages using 3 workers (10/10) in 220ms
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/[...path]
+├ ○ /ask
+├ ○ /dashboard
+├ ○ /favorites
+├ ○ /news
+├ ○ /portfolio
+├ ○ /settings
+├ ○ /stats
+└ ƒ /stock/[sym]
+
+ƒ Proxy (Middleware)
+Build Completed in /vercel/output [20s]
+✓ Ready in 34s
+Aliased https://daybook-trade-web.vercel.app
+```
+
+Gate result remains **BLOCKED**. Both Vercel runtimes now build, but neither
+project has environment variables, no dedicated Daybook Supabase project
+exists in the connected account, and the Phase 1 gate still lacks real Alpaca
+quote/bar output. Phase 2 has not been started.

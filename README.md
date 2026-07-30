@@ -77,12 +77,13 @@ credential belongs in the frontend.
 
 ## Vercel deployment
 
-Create two Vercel projects from this repository:
+Daybook uses two Vercel projects from this repository so the Python and
+Next.js runtimes can deploy independently:
 
-| Project | Root directory | Required environment |
-| --- | --- | --- |
-| Daybook API | `.` | `APP_ENVIRONMENT=production`, `DATABASE_URL`, `DAYBOOK_API_TOKEN`, `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET_KEY`, and later-phase backend secrets |
-| Daybook Web | `frontend` | `DAYBOOK_API_ORIGIN=https://<daybook-api-domain>`, the same `DAYBOOK_API_TOKEN`, and `DAYBOOK_ACCESS_PASSWORD` |
+| Vercel project | Production URL | Root | Required environment |
+| --- | --- | --- | --- |
+| `daybook-trade` | `https://daybook-trade-one-wave.vercel.app` | `.` | `APP_ENVIRONMENT=production`, `DATABASE_URL`, `DAYBOOK_API_TOKEN`, `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET_KEY`, and later-phase backend secrets |
+| `daybook-trade-web` | `https://daybook-trade-web.vercel.app` | `frontend` | `DAYBOOK_API_ORIGIN=https://daybook-trade-one-wave.vercel.app`, the same `DAYBOOK_API_TOKEN`, and `DAYBOOK_ACCESS_PASSWORD` |
 
 Deploy the API first, set its stable HTTPS domain in the Web project, and then
 deploy the Web project. Generate separate strong values for the internal API
@@ -111,6 +112,10 @@ the internal API token; Supabase-backed local API runs require the token too.
 Production does not run Alembic or a continuous background poller during
 function startup. Quotes refresh on demand through `/api/prices`, while local
 SQLite development retains the specified 15/60-second poller.
+
+The API deployment uses Python 3.12 from `.python-version`. Its root
+`requirements.txt` intentionally lists runtime dependencies directly because
+Vercel's Python dependency parser does not accept a `-r` include directive.
 
 After both deployments:
 

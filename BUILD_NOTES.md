@@ -121,6 +121,15 @@
 - `APP_ENVIRONMENT=production` is the app-owned deployment marker. It makes
   the API fail closed even when Vercel's optional system environment variables
   are not exposed; Supabase-backed local runs also require the internal token.
+- Vercel projects are split by runtime: `daybook-trade` deploys the root
+  FastAPI app and `daybook-trade-web` deploys `frontend` as Next.js. This
+  follows Vercel's monorepo model rather than attempting to make a
+  Python-framework project serve the Next.js app:
+  <https://vercel.com/docs/monorepos>.
+- Vercel's Python build rejected the root `-r backend/requirements.txt`
+  include. The root manifest now lists production dependencies directly and
+  `.python-version` pins 3.12, following the current Python runtime guide:
+  <https://vercel.com/docs/functions/runtimes/python>.
 - The attached Ponytail 4.8.4 development rules were applied in `full` mode:
   existing SQLAlchemy/Alembic and the native Vercel/Next.js features were
   reused, and no Supabase SDK, scheduler replacement, monorepo framework, or

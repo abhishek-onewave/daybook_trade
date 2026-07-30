@@ -1,1 +1,8 @@
--r backend/requirements.txt
+alembic>=1.16,<2
+apscheduler>=3.11,<4
+fastapi>=0.116,<1
+httpx>=0.28,<1
+pydantic-settings>=2.10,<3
+psycopg[binary]>=3.2,<4
+sqlalchemy>=2.0,<3
+uvicorn[standard]>=0.35,<1
