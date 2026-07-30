@@ -30,6 +30,18 @@ class Settings(BaseSettings):
     daybook_daily_chat_cap: int = Field(default=300, ge=1)
     database_url: str = "sqlite:///./data/daybook.db"
     secret_key: str = ""
+    vercel: bool = False
+
+    @property
+    def sqlalchemy_database_url(self) -> str:
+        postgres_schemes = ("postgres://", "postgresql://", "postgresql+psycopg://")
+        if self.vercel and not self.database_url.startswith(postgres_schemes):
+            raise ValueError("DATABASE_URL must use Supabase Postgres on Vercel.")
+        if self.database_url.startswith("postgres://"):
+            return self.database_url.replace("postgres://", "postgresql+psycopg://", 1)
+        if self.database_url.startswith("postgresql://"):
+            return self.database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+        return self.database_url
 
     @property
     def anthropic_configured(self) -> bool:
@@ -51,4 +63,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

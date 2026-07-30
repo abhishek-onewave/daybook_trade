@@ -1,15 +1,16 @@
 from logging.config import fileConfig
 
 from backend.app import models  # noqa: F401
-from backend.app.db import Base
+from backend.app.db import Base, database_url
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 
 config = context.config
+config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 
@@ -28,10 +29,16 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
+    database_url = config.get_main_option("sqlalchemy.url")
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=(
+            {"prepare_threshold": None}
+            if database_url.startswith("postgresql+psycopg")
+            else {}
+        ),
     )
 
     with connectable.connect() as connection:
@@ -49,4 +56,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-

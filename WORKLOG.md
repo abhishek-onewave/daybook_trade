@@ -202,4 +202,322 @@ Actual output:
 found 0 vulnerabilities
 ```
 
-Phase 1 was not started.
+At the time this Phase 0 gate was recorded, Phase 1 had not been started.
+
+## Phase 1 — Quotes
+
+Status: **BLOCKED — VERIFY gate not passed** (2026-07-29)
+
+Implemented:
+
+- Direct asynchronous Alpaca REST snapshots and historical bars with
+  `feed=iex`, defensive finite-number validation, and backend-only credentials.
+- Eight-symbol snapshot polling (NVDA, AAPL, MSFT, TSLA, AMD, SPY, QQQ, DIA)
+  every 15 seconds during the regular weekday session and every 60 seconds
+  off-hours, persisted to `quotes_cache`.
+- `/api/prices` and `/api/bars` with timestamps, structured unavailable states,
+  and a `1M` hourly-bars mapping designed to exceed 50 real chart points.
+- Dashboard watchlist, broad-market tiles, Stats table, and live tape with
+  loading, retry, partial-data, delayed, as-of, indicative-IEX, and honest
+  unavailable states. All display formatters reject non-finite values.
+- Supabase Postgres support through Psycopg, the port-6543 transaction pooler,
+  `NullPool`, disabled prepared statements, and a PostgreSQL-only RLS migration.
+- A Vercel FastAPI entrypoint and serverless mode that skips runtime migrations
+  and the continuous poller, while retaining request-driven quote refresh.
+- A PostgreSQL atomic quote upsert that prevents an older concurrent response
+  from overwriting a newer cached quote.
+
+Phase 2 has not been started. The implementation and offline checks are green,
+but the required real-data gate cannot pass because the private `.env` does not
+contain Alpaca credentials.
+
+### VERIFY attempt — prices
+
+Command:
+
+```text
+$ curl --silent --show-error --write-out '\nHTTP %{http_code}\n' http://127.0.0.1:8000/api/prices
+```
+
+Actual output:
+
+```text
+{"as_of":"2026-07-30T00:27:00.990201Z","feed":"iex","status":"unavailable","market_open":false,"quotes":{},"indices":{},"error":{"code":"MARKET_DATA_UNAVAILABLE","message":"Alpaca credentials are not configured."}}
+HTTP 503
+```
+
+Gate result: **BLOCKED**. This is an honest unavailable response, not real
+numeric data for the eight required symbols.
+
+### VERIFY attempt — NVDA one-month bars
+
+Command:
+
+```text
+$ curl --silent --show-error --write-out '\nHTTP %{http_code}\n' 'http://127.0.0.1:8000/api/bars?symbol=NVDA&range=1M'
+```
+
+Actual output:
+
+```text
+{"as_of":"2026-07-30T00:27:07.815065Z","feed":"iex","status":"unavailable","market_open":false,"error":{"code":"MARKET_DATA_NOT_CONFIGURED","message":"Alpaca credentials are not configured."}}
+HTTP 503
+```
+
+Gate result: **BLOCKED**. No real bar points were available without
+credentials.
+
+### Supporting checks — hydrated UI unavailable state
+
+A real headless Chromium session loaded each page after client hydration and
+checked the rendered text for its retryable error row, honest unavailable
+copy, IEX label, and any literal `NaN`.
+
+Actual output:
+
+```json
+{"route":"/dashboard","error_row":true,"honest_unavailable":true,"indicative_iex":true,"has_nan":false}
+{"route":"/stats","error_row":true,"honest_unavailable":true,"indicative_iex":true,"has_nan":false}
+```
+
+This proves the failure state is honest and contains no `NaN`; it does **not**
+satisfy the live-values UI gate.
+
+### Supporting checks — backend, guard, and frontend
+
+Command:
+
+```text
+$ make test
+```
+
+Relevant actual output:
+
+```text
+.venv/bin/python -m pytest backend/tests
+............                                                             [100%]
+12 passed, 1 warning in 0.38s
+cd frontend && npm run lint
+
+> daybook-frontend@0.1.0 lint
+> eslint .
+```
+
+Command:
+
+```text
+$ make guard
+```
+
+Relevant actual output:
+
+```text
+.venv/bin/python -m pytest backend/tests/test_read_only_guard.py
+.                                                                        [100%]
+1 passed in 0.01s
+.venv/bin/ruff check backend
+All checks passed!
+cd frontend && npm run lint
+
+> daybook-frontend@0.1.0 lint
+> eslint .
+```
+
+Command:
+
+```text
+$ cd frontend && npm run build
+```
+
+Relevant actual output:
+
+```text
+✓ Compiled successfully in 1402ms
+✓ Generating static pages using 7 workers (10/10) in 111ms
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /ask
+├ ○ /dashboard
+├ ○ /favorites
+├ ○ /news
+├ ○ /portfolio
+├ ○ /settings
+├ ○ /stats
+└ ƒ /stock/[sym]
+```
+
+### Supporting checks — Supabase and Vercel adaptation
+
+No existing connected Supabase project is identified as Daybook, so no remote
+database was selected or mutated. The migration was instead generated against
+PostgreSQL offline and inspected before a dedicated project is connected.
+
+Command:
+
+```text
+$ make test
+```
+
+Relevant actual output after the platform adaptation:
+
+```text
+.venv/bin/python -m pytest backend/tests
+.................                                                        [100%]
+17 passed, 1 warning in 0.39s
+cd frontend && npm run lint
+
+> daybook-frontend@0.1.0 lint
+> eslint .
+```
+
+Command:
+
+```text
+$ make guard
+```
+
+Actual output:
+
+```text
+.venv/bin/python -m pytest backend/tests/test_read_only_guard.py
+.                                                                        [100%]
+1 passed in 0.01s
+.venv/bin/ruff check backend
+All checks passed!
+cd frontend && npm run lint
+
+> daybook-frontend@0.1.0 lint
+> eslint .
+```
+
+Command:
+
+```text
+$ DATABASE_URL='postgresql://postgres:test@localhost:6543/postgres?sslmode=require' \
+  .venv/bin/alembic -c backend/alembic.ini upgrade head --sql
+```
+
+Relevant actual output:
+
+```text
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Generating static SQL
+ALTER TABLE "alembic_version" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "conversations" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "messages" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "watchlist" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "news_items" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "quotes_cache" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "tt_tokens" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "portfolio_snapshots" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "settings" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "usage_log" ENABLE ROW LEVEL SECURITY;
+UPDATE alembic_version SET version_num='0002_supabase_rls'
+WHERE alembic_version.version_num = '0001_phase_0';
+```
+
+Command:
+
+```text
+$ DATABASE_URL='postgresql://postgres:test@localhost:6543/postgres?sslmode=require' \
+  .venv/bin/python -c '<inspect SQLAlchemy engine>'
+```
+
+Actual output:
+
+```text
+{'driver': 'psycopg', 'pool': 'NullPool', 'url': 'postgresql+psycopg://postgres:***@localhost:6543/postgres?sslmode=require'}
+```
+
+Command:
+
+```text
+$ VERCEL=1 DAYBOOK_API_ORIGIN=https://daybook-api.example.com/ \
+  node '<load frontend/next.config.mjs and print rewrites>'
+```
+
+Actual output:
+
+```json
+[{"source":"/api/:path*","destination":"https://daybook-api.example.com/api/:path*"}]
+```
+
+The same check without `DAYBOOK_API_ORIGIN` failed with the intended
+`DAYBOOK_API_ORIGIN is required on Vercel.` configuration error.
+
+Command:
+
+```text
+$ VERCEL=1 \
+  DATABASE_URL='postgresql://postgres:test@localhost:6543/postgres?sslmode=require' \
+  .venv/bin/python -c '<import root Vercel app>'
+```
+
+Actual output:
+
+```text
+{'title': 'Daybook API', 'vercel_entrypoint': True}
+```
+
+Command:
+
+```text
+$ cd frontend && npm run build
+```
+
+Relevant actual output:
+
+```text
+✓ Compiled successfully in 1382ms
+✓ Generating static pages using 7 workers (10/10) in 138ms
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /ask
+├ ○ /dashboard
+├ ○ /favorites
+├ ○ /news
+├ ○ /portfolio
+├ ○ /settings
+├ ○ /stats
+└ ƒ /stock/[sym]
+```
+
+### VERIFY re-attempt after platform adaptation
+
+Command:
+
+```text
+$ curl --fail --silent --show-error http://127.0.0.1:8000/api/health
+```
+
+Actual output:
+
+```json
+{"status":"ok","as_of":"2026-07-30T00:53:28.829747Z","database":{"configured":true,"connected":true},"integrations":{"anthropic_configured":false,"alpaca_configured":false,"tastytrade_configured":false,"finnhub_configured":false},"tastytrade_environment":"sandbox"}
+```
+
+Commands:
+
+```text
+$ curl --silent --show-error --write-out '\nHTTP %{http_code}\n' http://127.0.0.1:8000/api/prices
+$ curl --silent --show-error --write-out '\nHTTP %{http_code}\n' \
+  'http://127.0.0.1:8000/api/bars?symbol=NVDA&range=1M'
+```
+
+Actual output:
+
+```text
+{"as_of":"2026-07-30T00:53:28.850918Z","feed":"iex","status":"unavailable","market_open":false,"quotes":{},"indices":{},"error":{"code":"MARKET_DATA_UNAVAILABLE","message":"Alpaca credentials are not configured."}}
+HTTP 503
+{"as_of":"2026-07-30T00:53:28.860550Z","feed":"iex","status":"unavailable","market_open":false,"error":{"code":"MARKET_DATA_NOT_CONFIGURED","message":"Alpaca credentials are not configured."}}
+HTTP 503
+```
+
+Gate result remains **BLOCKED**. Supabase/Vercel compatibility is supported by
+real local and generated-SQL evidence, but the Phase 1 gate still requires a
+deployed or local environment containing real Alpaca credentials. Phase 2 has
+not been started.

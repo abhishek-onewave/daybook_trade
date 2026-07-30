@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { PageScaffold } from "@/components/page-scaffold";
+import { StatsQuotes } from "@/components/stats-quotes";
 
 export const metadata: Metadata = { title: "Stats" };
 
@@ -9,8 +10,9 @@ export default function StatsPage() {
     <PageScaffold
       eyebrow="Market pulse"
       title="The numbers at a glance."
-      description="Indicative IEX quotes, index proxies, and dense watchlist statistics."
-    />
+      description="Indicative IEX quotes, broad-market proxies, and dense watchlist statistics with source timestamps."
+    >
+      <StatsQuotes />
+    </PageScaffold>
   );
 }
-
