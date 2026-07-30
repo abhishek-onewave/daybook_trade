@@ -3,14 +3,14 @@
 ## Zero-credential Vercel preview
 
 `DAYBOOK_DEMO_MODE=true` is an explicit temporary deployment mode for viewing
-the application before credentials are configured. The API migrates a
-throwaway SQLite database at `/tmp/daybook-demo.db`, disables the internal API
-token requirement, does not start provider pollers, and refuses any Postgres
-`DATABASE_URL`. The Web project skips Basic authentication only in this mode,
-still requires an HTTPS API origin, and displays a persistent preview banner.
+the application before credentials are configured. The private API service
+migrates a throwaway SQLite database at `/tmp/daybook-demo.db`, disables the
+internal API token requirement, does not start provider pollers, and refuses
+any Postgres `DATABASE_URL`. The Web service skips Basic authentication only
+in this mode and displays a persistent preview banner.
 
-Remove the variable from both Vercel projects before connecting Supabase or any
-real provider. Demo mode is intentionally public and ephemeral.
+Remove the variable before connecting Supabase or any real provider. Demo mode
+is intentionally public and ephemeral.
 
 ## Phase 0
 
@@ -109,39 +109,32 @@ real provider. Demo mode is intentionally public and ephemeral.
   an update older than the stored `as_of`. This makes concurrent request-driven
   refreshes safe across Vercel instances; the in-process lock still avoids
   duplicate refreshes within one instance.
-- Vercel deployment uses two stable projects from the same repository: a
-  FastAPI project rooted at the repository and a Next.js project rooted at
-  `frontend`. Vercel Services was not selected because it remains a private
-  beta and is unnecessary for this build:
-  <https://vercel.com/docs/monorepos> and
-  <https://vercel.com/docs/frameworks/backend/fastapi>.
+- Vercel deployment uses one `daybook-trade-web` Services project. The
+  `frontend` Next.js service has a private binding to the `backend` FastAPI
+  service, and the backend has no public rewrite. This gives both runtimes one
+  deployment, domain, environment, and rollback boundary:
+  <https://vercel.com/kb/guide/vercel-services>.
 - Vercel function instances do not run Alembic or the continuous quote poller
   at startup. Schema migration is an explicit release operation, and the
   existing request-driven quote refresh supplies fresh data in serverless
   execution. Local development keeps the required 15/60-second poller.
-- The two-project deployment is private by default without adding an auth
-  dependency: the Web project uses HTTPS Basic authentication for the single
-  user, its server-side `/api` gateway injects a separate shared API token, and
-  FastAPI rejects direct tokenless requests. This avoids placing either secret
-  in browser JavaScript and keeps production CORS unnecessary.
+- The public Web service uses HTTPS Basic authentication for the single user.
+  Its server-side `/api` gateway injects a separate shared API token over a
+  private Vercel service binding, and FastAPI rejects tokenless requests. This
+  avoids placing either secret in browser JavaScript and keeps production CORS
+  unnecessary.
 - The Web gateway requires an exact same-origin `Origin` header for unsafe
   methods and rejects contrary `Sec-Fetch-Site` metadata, preventing Basic-auth
   CSRF before later phases add mutation routes.
-- Optional Vercel Authentication belongs on the Web project only. Enabling it
-  on the API project would challenge the Web project's server-side fetch unless
-  a separate Vercel automation-bypass secret and header were configured.
+- Optional Vercel Authentication applies once to the unified public project;
+  private backend traffic uses the internal service binding rather than the
+  public request pipeline.
 - `APP_ENVIRONMENT=production` is the app-owned deployment marker. It makes
   the API fail closed even when Vercel's optional system environment variables
   are not exposed; Supabase-backed local runs also require the internal token.
-- Vercel projects are split by runtime: `daybook-trade` deploys the root
-  FastAPI app and `daybook-trade-web` deploys `frontend` as Next.js. This
-  follows Vercel's monorepo model rather than attempting to make a
-  Python-framework project serve the Next.js app:
-  <https://vercel.com/docs/monorepos>.
-- Vercel's Python build rejected the root `-r backend/requirements.txt`
-  include. The root manifest now lists production dependencies directly and
-  `.python-version` pins 3.12, following the current Python runtime guide:
-  <https://vercel.com/docs/functions/runtimes/python>.
+- The private backend service installs its explicit Python package and pinned
+  dependencies from `backend/pyproject.toml`; `backend/.python-version` pins
+  Python 3.12.
 - The attached Ponytail 4.8.4 development rules were applied in `full` mode:
   existing SQLAlchemy/Alembic and the native Vercel/Next.js features were
   reused, and no Supabase SDK, scheduler replacement, monorepo framework, or

@@ -5,7 +5,12 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = (
+    BACKEND_ROOT.parent
+    if (BACKEND_ROOT.parent / "frontend").is_dir()
+    else BACKEND_ROOT
+)
 
 MODEL_FLAGSHIP = "claude-fable-5"
 MODEL_STANDARD = "claude-sonnet-4-6"

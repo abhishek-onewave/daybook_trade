@@ -3,7 +3,7 @@ from datetime import UTC, date, datetime
 from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.db import Base
+from .db import Base
 
 
 def utc_now() -> datetime:
@@ -103,4 +103,3 @@ class UsageLog(Base):
     chat_turns: Mapped[int] = mapped_column(Integer, default=0)
     tokens_in: Mapped[int] = mapped_column(Integer, default=0)
     tokens_out: Mapped[int] = mapped_column(Integer, default=0)
-

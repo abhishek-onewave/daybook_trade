@@ -28,7 +28,9 @@ function proxyHeaders(source: Headers) {
 }
 
 function gatewayConfig() {
-  const configuredOrigin = process.env.DAYBOOK_API_ORIGIN?.trim();
+  const configuredOrigin =
+    process.env.DAYBOOK_BACKEND_URL?.trim() ||
+    process.env.DAYBOOK_API_ORIGIN?.trim();
   const token = process.env.DAYBOOK_API_TOKEN?.trim();
 
   if (
@@ -36,16 +38,16 @@ function gatewayConfig() {
     (!configuredOrigin || (!DEMO_MODE && (!token || token.length < 32)))
   ) {
     throw new Error(
-      "A secure DAYBOOK_API_ORIGIN and, outside demo mode, DAYBOOK_API_TOKEN are required in production.",
+      "A secure DAYBOOK_BACKEND_URL and, outside demo mode, DAYBOOK_API_TOKEN are required in production.",
     );
   }
 
   const origin = new URL(configuredOrigin || "http://127.0.0.1:8000");
   if (!["http:", "https:"].includes(origin.protocol)) {
-    throw new Error("DAYBOOK_API_ORIGIN must use http or https.");
+    throw new Error("DAYBOOK_BACKEND_URL must use http or https.");
   }
   if (IS_PRODUCTION && origin.protocol !== "https:") {
-    throw new Error("DAYBOOK_API_ORIGIN must use https in production.");
+    throw new Error("DAYBOOK_BACKEND_URL must use https in production.");
   }
 
   return { origin: origin.origin, token };

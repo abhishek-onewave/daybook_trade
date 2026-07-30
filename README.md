@@ -77,49 +77,60 @@ credential belongs in the frontend.
 
 ## Vercel deployment
 
-Daybook uses two Vercel projects from this repository so the Python and
-Next.js runtimes can deploy independently:
+Daybook deploys as one Vercel Services project. The public Next.js service
+calls a private FastAPI service through Vercel's deployment-aware internal
+binding, so the frontend and backend build atomically under one domain.
 
-| Vercel project | Production URL | Root | Required environment |
+| Vercel project | Production URL | Root | Framework |
 | --- | --- | --- | --- |
-| `daybook-trade` | `https://daybook-trade.vercel.app` | `.` | `APP_ENVIRONMENT=production`, `DATABASE_URL`, `DAYBOOK_API_TOKEN`, `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET_KEY`, and later-phase backend secrets |
-| `daybook-trade-web` | `https://daybook-trade-web.vercel.app` | `frontend` | `DAYBOOK_API_ORIGIN=https://daybook-trade.vercel.app`, the same `DAYBOOK_API_TOKEN`, and `DAYBOOK_ACCESS_PASSWORD` |
+| `daybook-trade-web` | `https://daybook-trade-web.vercel.app` | `.` | Services (`frontend` Next.js + private `backend` FastAPI) |
+
+`vercel.json` owns both service builds. Vercel injects
+`DAYBOOK_BACKEND_URL` into the frontend service; do not create that variable
+manually and do not set `DAYBOOK_API_ORIGIN`.
 
 ### Temporary zero-credential preview
 
-To inspect the application shell before connecting any provider, set only:
-
-| Vercel project | Environment variables |
-| --- | --- |
-| `daybook-trade` | `DAYBOOK_DEMO_MODE=true` |
-| `daybook-trade-web` | `DAYBOOK_DEMO_MODE=true`, `DAYBOOK_API_ORIGIN=https://daybook-trade.vercel.app` |
+To inspect the application shell before connecting any provider, set only
+`DAYBOOK_DEMO_MODE=true` in `daybook-trade-web`.
 
 This explicit preview mode is public, labels itself in the UI and health
 response, and stores only seeded demo state in ephemeral Vercel `/tmp` SQLite.
 Market, AI, brokerage, news, and portfolio data remain unavailable rather than
 being fabricated. Preview mode refuses to connect to Postgres, so remove
-`DAYBOOK_DEMO_MODE` from both projects before adding `DATABASE_URL`, Supabase,
-broker, AI, API-token, or access-password configuration.
+`DAYBOOK_DEMO_MODE` before adding `DATABASE_URL`, Supabase, broker, AI,
+API-token, or access-password configuration.
 
-Deploy the API first, set its stable HTTPS domain in the Web project, and then
-deploy the Web project. Generate separate strong values for the internal API
-token and the human access password:
+For the credential-backed deployment, configure all server-only variables once
+in `daybook-trade-web`:
+
+| Variable | Purpose |
+| --- | --- |
+| `APP_ENVIRONMENT=production` | Enables the production safety contract |
+| `DATABASE_URL` | Supabase transaction-pooler URI on port 6543 |
+| `DAYBOOK_API_TOKEN` | Authenticates the Web gateway to the private backend |
+| `DAYBOOK_ACCESS_PASSWORD` | Single-user Web Basic-auth password |
+| `SECRET_KEY` | Encrypts stored broker tokens |
+| `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET_KEY` | Alpaca market data |
+| `ANTHROPIC_API_KEY` | Anthropic chat |
+| `TASTYTRADE_CLIENT_ID`, `TASTYTRADE_CLIENT_SECRET`, `TASTYTRADE_ENV` | Read-only Tastytrade OAuth |
+| `FINNHUB_API_KEY` | Finnhub news |
+| `DAYBOOK_DAILY_CHAT_CAP=300` | Optional daily chat limit |
+
+Generate separate strong values for the internal API token, encryption key,
+and human access password:
 
 ```bash
 python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
 ```
 
-The Web project requires HTTP Basic authentication over HTTPS (username
+The public service requires HTTP Basic authentication over HTTPS (username
 `daybook`, password `DAYBOOK_ACCESS_PASSWORD`) and proxies relative `/api/*`
-requests server-side. The proxy adds `DAYBOOK_API_TOKEN`; direct API requests
-without that token are rejected. Neither secret is exposed through a
-`NEXT_PUBLIC_` variable. Unsafe Web gateway methods also require an exact
-same-origin `Origin` header so later write routes cannot inherit Basic-auth
-CSRF exposure. Vercel Authentication on **All Deployments** can be
-enabled as an additional platform-level gate on the **Web project only** when
-the account plan supports it. Leave that platform gate off on the API project:
-the cross-project Web gateway authenticates to FastAPI with
-`DAYBOOK_API_TOKEN`, not a Vercel Authentication cookie or bypass secret.
+requests server-side over the Vercel service binding. The gateway adds
+`DAYBOOK_API_TOKEN`; the FastAPI service has no public rewrite. No secret is
+exposed through a `NEXT_PUBLIC_` variable. Unsafe Web gateway methods also
+require an exact same-origin `Origin` header so later write routes cannot
+inherit Basic-auth CSRF exposure.
 
 `APP_ENVIRONMENT=production` is an app-owned deployment marker, so security
 does not depend on Vercel's optional system-environment exposure setting.
@@ -129,19 +140,18 @@ Production does not run Alembic or a continuous background poller during
 function startup. Quotes refresh on demand through `/api/prices`, while local
 SQLite development retains the specified 15/60-second poller.
 
-The API deployment uses Python 3.12 from `.python-version`. Its root
-`requirements.txt` intentionally lists runtime dependencies directly because
-Vercel's Python dependency parser does not accept a `-r` include directive.
+The backend service uses Python 3.12 from `backend/.python-version` and installs
+its pinned runtime dependencies from `backend/pyproject.toml`.
 
-After both deployments:
+After deployment:
 
 ```bash
-curl -H "x-daybook-api-token: $DAYBOOK_API_TOKEN" \
-  https://<daybook-api-domain>/api/health
 curl -u "daybook:$DAYBOOK_ACCESS_PASSWORD" \
-  https://<daybook-web-domain>/api/prices
+  https://daybook-trade-web.vercel.app/api/health
 curl -u "daybook:$DAYBOOK_ACCESS_PASSWORD" \
-  'https://<daybook-web-domain>/api/bars?symbol=NVDA&range=1M'
+  https://daybook-trade-web.vercel.app/api/prices
+curl -u "daybook:$DAYBOOK_ACCESS_PASSWORD" \
+  'https://daybook-trade-web.vercel.app/api/bars?symbol=NVDA&range=1M'
 ```
 
 Log the actual responses in `WORKLOG.md`; Phase 1 passes only when those calls

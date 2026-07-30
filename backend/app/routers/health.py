@@ -5,8 +5,8 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from backend.app.config import get_settings
-from backend.app.db import SessionLocal
+from ..config import get_settings
+from ..db import SessionLocal
 
 router = APIRouter(prefix="/api", tags=["health"])
 

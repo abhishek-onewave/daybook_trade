@@ -7,7 +7,8 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy.pool import NullPool
 
 from alembic import command
-from backend.app.config import REPO_ROOT, get_settings
+
+from .config import BACKEND_ROOT, REPO_ROOT, get_settings
 
 settings = get_settings()
 database_url = settings.sqlalchemy_database_url
@@ -41,8 +42,8 @@ def get_db() -> Generator[Session]:
 
 
 def run_migrations() -> None:
-    config = Config(str(REPO_ROOT / "backend" / "alembic.ini"))
-    config.set_main_option("script_location", str(REPO_ROOT / "backend" / "alembic"))
+    config = Config(str(BACKEND_ROOT / "alembic.ini"))
+    config.set_main_option("script_location", str(BACKEND_ROOT / "alembic"))
     # ConfigParser treats percent signs in URL-encoded passwords as interpolation.
     config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
     command.upgrade(config, "head")

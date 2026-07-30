@@ -903,3 +903,82 @@ HTTP 503
 The zero-credential preview is **PASS** and the app shell is publicly
 inspectable. The Phase 1 gate remains **BLOCKED** because its contract requires
 real Alpaca quote/bar values; Phase 2 has not been started.
+
+### Unified Vercel Services deployment
+
+The two-project deployment was consolidated into the single existing
+`one-wave/daybook-trade-web` project. `vercel.json` now defines a public
+Next.js `frontend` service with a private binding to a FastAPI `backend`
+service. Only the frontend has a public rewrite; browser `/api/*` requests
+continue through the authenticated Next.js gateway before it calls FastAPI
+over the deployment-aware internal binding.
+
+The Vercel project Root Directory was changed from `frontend` to the repository
+root and its Framework Preset was changed from `nextjs` to `services`.
+`DAYBOOK_API_ORIGIN` was removed because Vercel now injects
+`DAYBOOK_BACKEND_URL` for the private binding.
+
+Real local Vercel Services startup:
+
+```text
+$ DAYBOOK_DEMO_MODE=true npx --yes vercel@58.1.0 dev -L \
+    --listen 3005 --project daybook-trade-web --scope one-wave --yes
+Detected services:
+• frontend  [Next.js]
+• backend   [FastAPI]
+> Available at:
+  http://localhost:3005
+[frontend] ✓ Ready in 372ms
+[backend] INFO: Uvicorn running
+[backend] INFO: Application startup complete.
+```
+
+Real local unified-route checks:
+
+```text
+$ curl --location http://127.0.0.1:3005/
+WEB HTTP 200
+
+$ curl http://127.0.0.1:3005/api/health
+{"status":"ok","mode":"demo","as_of":"2026-07-30T03:05:01.528696Z","database":{"configured":true,"connected":true},"integrations":{"anthropic_configured":false,"alpaca_configured":false,"tastytrade_configured":false,"finnhub_configured":false},"tastytrade_environment":"sandbox"}
+HEALTH HTTP 200
+
+$ curl http://127.0.0.1:3005/api/prices
+{"as_of":"2026-07-30T03:05:01.564072Z","feed":"iex","status":"unavailable","market_open":false,"quotes":{},"indices":{},"error":{"code":"MARKET_DATA_UNAVAILABLE","message":"Alpaca credentials are not configured."}}
+PRICES HTTP 503
+```
+
+The first unified production build completed both service builds in one
+deployment:
+
+```text
+Detected Next.js version: 16.2.12
+✓ Compiled successfully in 3.3s
+Finished TypeScript in 2.7s
+✓ Generating static pages using 3 workers (10/10) in 279ms
+Using Python 3.12 from backend/.python-version
+Installing required dependencies from pyproject.toml...
+Compiling Python bytecode...
+Build Completed in /vercel/output [25s]
+Aliased https://daybook-trade-web.vercel.app
+Ready in 43s
+```
+
+Real production checks through the single public project:
+
+```text
+$ curl --location https://daybook-trade-web.vercel.app/
+WEB HTTP 200
+
+$ curl https://daybook-trade-web.vercel.app/api/health
+{"status":"ok","mode":"demo","as_of":"2026-07-30T03:08:39.002253Z","database":{"configured":true,"connected":true},"integrations":{"anthropic_configured":false,"alpaca_configured":false,"tastytrade_configured":false,"finnhub_configured":false},"tastytrade_environment":"sandbox"}
+HEALTH HTTP 200
+
+$ curl https://daybook-trade-web.vercel.app/api/prices
+{"as_of":"2026-07-30T03:08:41.097807Z","feed":"iex","status":"unavailable","market_open":false,"quotes":{},"indices":{},"error":{"code":"MARKET_DATA_UNAVAILABLE","message":"Alpaca credentials are not configured."}}
+PRICES HTTP 503
+```
+
+The one-project deployment checkpoint is **PASS**. The Phase 1 gate remains
+**BLOCKED** because its contract requires real Alpaca quote/bar values; Phase 2
+has not been started.

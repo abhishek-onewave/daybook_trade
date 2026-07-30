@@ -6,10 +6,10 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from backend.app.config import get_settings
-from backend.app.db import run_migrations
-from backend.app.routers import health, prices
-from backend.app.services.alpaca import AlpacaClient, run_quote_poller
+from .config import get_settings
+from .db import run_migrations
+from .routers import health, prices
+from .services.alpaca import AlpacaClient, run_quote_poller
 
 
 @asynccontextmanager

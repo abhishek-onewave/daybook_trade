@@ -17,9 +17,9 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.orm import Session
 
-from backend.app.config import Settings
-from backend.app.db import SessionLocal
-from backend.app.models import QuoteCache
+from ..config import Settings
+from ..db import SessionLocal
+from ..models import QuoteCache
 
 logger = logging.getLogger(__name__)
 

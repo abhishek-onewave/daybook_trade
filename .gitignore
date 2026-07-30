@@ -4,6 +4,8 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
+backend/build/
+backend/*.egg-info/
 data/*.db
 data/*.db-*
 frontend/.next/
@@ -12,3 +14,4 @@ frontend/npm-debug.log*
 .DS_Store
 
 .vercel
+.env.local

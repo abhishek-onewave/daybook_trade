@@ -1,7 +1,11 @@
 from logging.config import fileConfig
 
-from backend.app import models  # noqa: F401
-from backend.app.db import Base, database_url
+try:
+    from backend.app import models  # noqa: F401
+    from backend.app.db import Base, database_url
+except ModuleNotFoundError:
+    from app import models  # type: ignore[no-redef] # noqa: F401
+    from app.db import Base, database_url  # type: ignore[no-redef]
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context

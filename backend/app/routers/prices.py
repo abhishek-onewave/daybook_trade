@@ -10,9 +10,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from backend.app.config import Settings, get_settings
-from backend.app.db import get_db
-from backend.app.services.alpaca import (
+from ..config import Settings, get_settings
+from ..db import get_db
+from ..services.alpaca import (
     ALPACA_FEED,
     BAR_RANGES,
     INDEX_SYMBOLS,
