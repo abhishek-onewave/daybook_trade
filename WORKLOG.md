@@ -982,3 +982,33 @@ PRICES HTTP 503
 The one-project deployment checkpoint is **PASS**. The Phase 1 gate remains
 **BLOCKED** because its contract requires real Alpaca quote/bar values; Phase 2
 has not been started.
+
+The Git-driven deployment for commit `8b00566` was then verified after
+`DAYBOOK_API_ORIGIN` had been removed:
+
+```text
+status  ● Ready
+
+Builds
+├── λ services/backend/fastapi (32.37MB) [iad1]
+├── λ services/frontend/index (674.5KB) [iad1]
+└── 73 output items hidden
+
+$ curl https://daybook-trade-web.vercel.app/api/health
+{"status":"ok","mode":"demo","as_of":"2026-07-30T03:13:13.939524Z","database":{"configured":true,"connected":true},"integrations":{"anthropic_configured":false,"alpaca_configured":false,"tastytrade_configured":false,"finnhub_configured":false},"tastytrade_environment":"sandbox"}
+HEALTH HTTP 200
+```
+
+The obsolete project was removed only after that final binding check:
+
+```text
+$ vercel project remove daybook-trade --scope one-wave
+Success! Project daybook-trade removed
+
+$ vercel project list --scope one-wave
+daybook-trade-web  https://daybook-trade-web.vercel.app
+```
+
+The removed Vercel project and its historical deployments are not recoverable
+through this workspace. The Git repository and retained
+`daybook-trade-web` deployment contain the complete application source.
